@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"regexp"
+	"time"
 )
 
 const (
@@ -15,8 +16,10 @@ const (
 )
 
 func main() {
-	c := http.Client{}
-	req, err := http.NewRequest("GET", "https://oidref.com/0.2", nil)
+	c := http.Client{
+		Timeout: 10 * time.Second,
+	}
+	req, err := http.NewRequest("GET", "https://oidref.com/", nil)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -41,21 +44,45 @@ func main() {
 
 	fmt.Println(resp.Status)
 	//fmt.Println(string(b))
-	re1, err := regexp.Compile(`Children.*?Brothers`)
-	re2, err := regexp.Compile(`<tr>.*?</tr>`)
-	re3, err := regexp.Compile(`<td>.*?<td>`)
+	re1, err := regexp.Compile(`<tr>((?:.|\n)*?)</tr>`)
+	re2, err := regexp.Compile(`(<td>(?:.|\n)*?"(?P<url>/.)*".*?</td>)(<td>(?P<name>.*?)</td>)(<td>(?P<subChildren>.*?)</td>)(<td>(?P<subNodesTotal>.*?)</td>)(<td>(?P<description>(?:.|\n)*?)</td>)`)
+	//re3, err := regexp.Compile(`<td>.+?<td>`)
 	table := re1.FindAllString(string(b), -1)
-	fmt.Println(table)
-	rows := re2.FindAllString(table[0], -1)
-	for i, v := range rows {
-		if i == 0 {
-			continue
+	//fmt.Println(table)
+	for _, row := range table {
+		for _, v := range re2.FindAllStringSubmatch(row, -1) {
+			for kk, vv := range re2.SubexpNames() {
+				if vv == "url" {
+					fmt.Print(v[kk])
+				}
+				if vv == "name" {
+					fmt.Print(v[kk])
+				}
+				if vv == "subChildren" {
+					fmt.Print(v[kk])
+				}
+				if vv == "subNodesTotal" {
+					fmt.Print(v[kk])
+				}
+				if vv == "description" {
+					fmt.Print(v[kk])
+				}
+			}
 		}
-		data := re3.FindAllString(v, -1)
-		for _, d := range data {
-			fmt.Print(d)
-		}
-		fmt.Print("\n")
+		fmt.Println("\n\n")
 	}
+	//fmt.Println(table)
+
+	//rows := re2.FindAllString(table[0], -1)
+	//for i, v := range rows {
+	//	if i == 0 {
+	//		continue
+	//	}
+	//	data := re3.FindAllString(v, -1)
+	//	for _, d := range data {
+	//		fmt.Print(d)
+	//	}
+	//	fmt.Print("\n")
+	//}
 
 }
