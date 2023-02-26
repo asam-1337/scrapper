@@ -1,11 +1,13 @@
 package controller
 
 import (
+	"context"
 	"fmt"
 	"github.com/schollz/progressbar/v3"
 	"log"
 	"math/rand"
 	"net/http"
+	"os"
 	"scrapper/internal/domain"
 	"scrapper/internal/localErrors"
 	"time"
@@ -17,27 +19,28 @@ const (
 	AcceptLanguage = "ru,en;q=0.9"
 )
 
-type Client struct {
-	client   *http.Client
-	svc      domain.NodesService
-	attempts int
-	bar      *progressbar.ProgressBar
+type CLI struct {
+	client      *http.Client
+	svc         domain.NodesService
+	bar         *progressbar.ProgressBar
+	currentNode string
+	attempts    int
 }
 
-func NewClient(svc domain.NodesService) *Client {
-	return &Client{
+func NewClient(svc domain.NodesService) *CLI {
+	return &CLI{
 		client: &http.Client{
 			Timeout: 20 * time.Second,
 		},
 		svc: svc,
-		bar: progressbar.DefaultBytes(
+		bar: progressbar.Default(
 			-1,
 			"total nodes parsing",
 		),
 	}
 }
 
-func (c *Client) Do(url string) (*http.Response, error) {
+func (c *CLI) Do(url string) (*http.Response, error) {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("cant create req: %s", err.Error())
@@ -55,8 +58,10 @@ func (c *Client) Do(url string) (*http.Response, error) {
 	return resp, nil
 }
 
-func (c *Client) Parse(url string) error {
-	time.Sleep(time.Duration(rand.Intn(10)) * time.Second)
+func (c *CLI) Parse(ctx context.Context, url string) error {
+	time.Sleep(time.Duration(rand.Intn(3)) * time.Second)
+	c.currentNode = url
+
 	resp, err := c.Do(url)
 	if err != nil {
 		return err
@@ -74,26 +79,45 @@ func (c *Client) Parse(url string) error {
 
 	for _, node := range nodes {
 		url = "https://oidref.com" + node.OID
-		retry(c.Parse, url)
+		retry(ctx, url, c.Parse)
 	}
 
 	return nil
 }
 
-func retry(f func(string) error, url string) {
-	err := f(url)
+func retry(ctx context.Context, url string, f func(context.Context, string) error) {
+	err := f(ctx, url)
 
 	for err != nil {
 		for i := 0; i < 10; i++ {
-			err = f(url)
-			if err != nil {
-				log.Printf("url:%s, attemption: %d, error: %s", url, i, err.Error())
+			log.Printf("url:%s, attemption: %d, error: %s", url, i, err.Error())
+			err = f(ctx, url)
+			if err == nil {
+				return
 			}
 		}
 		time.Sleep(60 * time.Second)
 	}
 }
 
-func (c *Client) StartParsing() {
-	retry(c.Parse, "https://oidref.com/")
+func (c *CLI) StartParsing(ctx context.Context) {
+	go c.Close(ctx)
+	retry(ctx, "https://oidref.com/", c.Parse)
+}
+
+func (c *CLI) Close(ctx context.Context) {
+	<-ctx.Done()
+
+	f, err := os.Create("./save.txt")
+	if err != nil {
+		log.Println(err)
+	}
+	defer f.Close()
+
+	_, err = f.WriteString(c.currentNode)
+	if err != nil {
+		log.Println(err)
+	}
+
+	os.Exit(0)
 }

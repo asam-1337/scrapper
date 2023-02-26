@@ -26,16 +26,17 @@ type Parser struct {
 func NewParserService() *Parser {
 	reTable, err := regexp.Compile(`<table>(.|\n)*?</table>`)
 	if err != nil {
+		log.Println(err)
 		return nil
 	}
 
-	reH3, err := regexp.Compile(`<h3>Children \\(.*?\\)</h3>`)
+	reH3, err := regexp.Compile(`<h3>Children.*?</h3>`)
 	if err != nil {
 		log.Println(err)
 		return nil
 	}
 
-	reRows, err := regexp.Compile(`<tr>(.|\n)*?(<td>(.*?)"(?P<url>.*?)"(.*?)</td>)(.|\n)*?(<td>(?P<name>.*?)</td>)(.|\n)*?(<td>(?P<children>.*?)</td>)(.|\n)*?(<td>(?P<subNodesTotal>.*?)</td>)(.|\n)*?(<td>(?P<description>.*?)</td>)(.|\n)*?</tr>`)
+	reRows, err := regexp.Compile(`<tr>(.|\n)*?(<td>(.*?)"(?P<url>.*?)"(.*?)</td>)(.|\n)*?(<td>(?P<name>.*?)</td>)(.|\n)*?(<td>(?P<subChildren>.*?)</td>)(.|\n)*?(<td>(?P<subNodesTotal>.*?)</td>)(.|\n)*?(<td>(?P<description>.*?)</td>)(.|\n)*?</tr>`)
 	if err != nil {
 		log.Println(err)
 		return nil
@@ -53,16 +54,16 @@ func (p *Parser) ParseNodes(resp *http.Response) ([]entity.Node, error) {
 
 	html, err := io.ReadAll(resp.Body)
 	if err != nil {
-		fmt.Println(err)
-		return nil, err
+		return nil, fmt.Errorf("cant read resp.Body: %s", err.Error())
 	}
 
+	url := resp.Request.URL.Path
 	childrenHeader := p.h3Exp.FindString(string(html))
-	if childrenHeader == "" {
+	if childrenHeader == "" && url != "/" {
 		return nil, localErrors.ErrNotFoundChildren
 	}
 
-	var nodes []entity.Node
+	nodes := make([]entity.Node, 0)
 	table := p.tableExp.FindString(string(html))
 	rows := p.rowsExp.FindAllStringSubmatch(table, -1)
 

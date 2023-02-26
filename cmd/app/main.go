@@ -1,10 +1,14 @@
 package main
 
 import (
+	"context"
 	"log"
+	"os"
+	"os/signal"
 	"scrapper/internal/controller"
 	"scrapper/internal/repository"
 	"scrapper/internal/service"
+	"syscall"
 )
 
 func main() {
@@ -13,9 +17,24 @@ func main() {
 		log.Fatal(err)
 	}
 
-	repo := repository.NewNodesRepository(db)
-	svc := service.NewNodesService(repo)
-	client := controller.NewClient(svc)
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs,
+		syscall.SIGHUP,
+		syscall.SIGINT,
+		syscall.SIGTERM,
+		syscall.SIGQUIT)
+	ctx, cancel := context.WithCancel(context.Background())
 
-	client.Parse("https://oidref.com/")
+	go func() {
+		<-sigs
+		cancel()
+	}()
+
+	repo := repository.NewNodesRepository(db)
+	parser := service.NewParserService()
+	svc := service.NewNodesService(repo, parser)
+	cli := controller.NewClient(svc)
+
+	cli.StartParsing(ctx)
+
 }

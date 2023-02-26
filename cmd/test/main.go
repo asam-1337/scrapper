@@ -1,12 +1,11 @@
 package main
 
 import (
+	"database/sql"
 	"fmt"
-	"io"
-	"net/http"
-	"regexp"
-	"scrapper/internal/repository"
-	"time"
+	_ "github.com/mattn/go-sqlite3"
+	"log"
+	"scrapper/internal/domain/entity"
 )
 
 const (
@@ -16,64 +15,83 @@ const (
 	AcceptLanguage = "ru,en;q=0.9"
 )
 
+func recursion() {
+	fmt.Println(1)
+	recursion()
+}
+
 func main() {
-	_, err := repository.NewSqliteDb()
-
-	c := http.Client{
-		Timeout: 20 * time.Second,
-	}
-	req, err := http.NewRequest("GET", "https://oidref.com/0", nil)
+	db, err := sql.Open("sqlite3", "./migrations/test2.db")
 	if err != nil {
-		fmt.Println(err)
-		return
+		log.Fatal(err)
 	}
-	req.Header.Set("User-Agent", UserAgent)
-	req.Header.Set("Accept", Accept)
-	//req.Header.Set("Accept-Encoding", AcceptEncoding)
-	req.Header.Set("Accept-Language", AcceptLanguage)
 
-	resp, err := c.Do(req)
+	rows, err := db.Query("select * from nodes")
 	if err != nil {
-		fmt.Println(err)
-		return
+		log.Fatal(err)
 	}
-
-	defer resp.Body.Close()
-	b, err := io.ReadAll(resp.Body)
-	if err != nil {
-		fmt.Println(err)
-		return
+	for rows.Next() {
+		node := entity.Node{}
+		rows.Scan(&node.OID, &node.Name, &node.SubChildren, &node.SubNodesTotal, &node.Description)
+		fmt.Println(node)
 	}
-
-	fmt.Println(resp.Status)
-	//fmt.Println(string(b))
-	//re, err := regexp.Compile(`<h3>Children \(.*?\)</h3>`)
-	//re1, err := regexp.Compile(`<tr>((?:.|\n)*?)</tr>`)
-	re2, err := regexp.Compile(`<tr>(.|\n)*?(<td>(.*?)"(?P<url>.*?)"(.*?)</td>)(.|\n)*?(<td>(?P<name>.*?)</td>)(.|\n)*?(<td>(?P<children>.*?)</td>)(.|\n)*?(<td>(?P<subNodesTotal>.*?)</td>)(.|\n)*?(<td>(?P<description>.*?)</td>)(.|\n)*?</tr>`)
-	//table := re1.FindAllString(string(b), -1)
-	//fmt.Println(table)
-	rows := re2.FindAllStringSubmatch(string(b), -1)
-	//fmt.Println(rows)
-	for _, v := range rows {
-		for kk, vv := range re2.SubexpNames() {
-			if vv == "url" {
-				fmt.Print(v[kk] + " ")
-			}
-			if vv == "name" {
-				fmt.Print(v[kk] + " ")
-			}
-			if vv == "subChildren" {
-				fmt.Print(v[kk] + " ")
-			}
-			if vv == "subNodesTotal" {
-				fmt.Print(v[kk] + " ")
-			}
-			if vv == "description" {
-				fmt.Print(v[kk] + " ")
-			}
-		}
-		fmt.Println("\n\n")
-	}
+	//_, err := repository.NewSqliteDb()
+	//
+	//c := http.Client{
+	//	Timeout: 20 * time.Second,
+	//}
+	//req, err := http.NewRequest("GET", "https://oidref.com/0.5", nil)
+	//if err != nil {
+	//	fmt.Println(err)
+	//	return
+	//}
+	//req.Header.Set("User-Agent", UserAgent)
+	//req.Header.Set("Accept", Accept)
+	////req.Header.Set("Accept-Encoding", AcceptEncoding)
+	//req.Header.Set("Accept-Language", AcceptLanguage)
+	//
+	//resp, err := c.Do(req)
+	//if err != nil {
+	//	fmt.Println(err)
+	//	return
+	//}
+	//
+	//defer resp.Body.Close()
+	//b, err := io.ReadAll(resp.Body)
+	//if err != nil {
+	//	fmt.Println(err)
+	//	return
+	//}
+	//
+	//fmt.Println(resp.Status)
+	////fmt.Println(string(b))
+	////re, err := regexp.Compile(`<h3>Children \(.*?\)</h3>`)
+	////re1, err := regexp.Compile(`<tr>((?:.|\n)*?)</tr>`)
+	//re2, err := regexp.Compile(`<tr>(.|\n)*?(<td>(.*?)"(?P<url>.*?)"(.*?)</td>)(.|\n)*?(<td>(?P<name>.*?)</td>)(.|\n)*?(<td>(?P<children>.*?)</td>)(.|\n)*?(<td>(?P<subNodesTotal>.*?)</td>)(.|\n)*?(<td>(?P<description>.*?)</td>)(.|\n)*?</tr>`)
+	////table := re1.FindAllString(string(b), -1)
+	////fmt.Println(table)
+	//rows := re2.FindAllStringSubmatch(string(b), -1)
+	////fmt.Println(rows)
+	//for _, v := range rows {
+	//	for kk, vv := range re2.SubexpNames() {
+	//		if vv == "url" {
+	//			fmt.Print(v[kk] + " ")
+	//		}
+	//		if vv == "name" {
+	//			fmt.Print(v[kk] + " ")
+	//		}
+	//		if vv == "subChildren" {
+	//			fmt.Print(v[kk] + " ")
+	//		}
+	//		if vv == "subNodesTotal" {
+	//			fmt.Print(v[kk] + " ")
+	//		}
+	//		if vv == "description" {
+	//			fmt.Print(v[kk] + " ")
+	//		}
+	//	}
+	//	fmt.Println("\n\n")
+	//}
 	//fmt.Println(table)
 
 	//rows := re2.FindAllString(table[0], -1)
